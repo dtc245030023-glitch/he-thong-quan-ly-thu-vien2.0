@@ -48,6 +48,28 @@ app.use(
 
 app.use(express.urlencoded({ extended: false, limit: '64kb', parameterLimit: 50 }));
 
+// Structured access log consumed by Promtail/Loki. Only method, path, status
+// and duration are logged: query strings, bodies and headers may contain
+// personal data or secrets and are deliberately excluded.
+app.use((req, res, next) => {
+  if (req.path === '/metrics' || req.path === '/health') return next();
+
+  const startedAt = process.hrtime.bigint();
+  res.on('finish', () => {
+    const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
+    console.log(
+      JSON.stringify({
+        event: 'http_request',
+        method: req.method,
+        path: req.path,
+        status: res.statusCode,
+        duration_ms: Number(durationMs.toFixed(1)),
+      }),
+    );
+  });
+  return next();
+});
+
 // Prometheus metrics. `/metrics` is scraped inside the Docker network and is
 // explicitly blocked at the Nginx edge so it is never exposed publicly.
 app.use(

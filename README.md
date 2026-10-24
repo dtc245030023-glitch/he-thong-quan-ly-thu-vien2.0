@@ -1,6 +1,6 @@
 # Hệ thống Quản lý Thư viện
 
-Ứng dụng web quản lý thư viện thu nhỏ: quản lý sách, độc giả và nghiệp vụ mượn/trả sách. Toàn bộ hệ thống chạy bằng Docker Compose, gồm Node.js/Express, PostgreSQL 16, pgAdmin 4, Nginx làm reverse proxy và bộ giám sát Prometheus + Grafana.
+Ứng dụng web quản lý thư viện thu nhỏ: quản lý sách, độc giả và nghiệp vụ mượn/trả sách. Toàn bộ hệ thống chạy bằng Docker Compose, gồm Node.js/Express, PostgreSQL 16, pgAdmin 4, Nginx làm reverse proxy, bộ giám sát Prometheus + Grafana và hệ thống log tập trung Loki + Promtail.
 
 ## 1. Kiến trúc hệ thống
 
@@ -43,7 +43,14 @@
       Docker host / cgroups (CPU, RAM, network của container)
 ```
 
-Chỉ service `nginx` được publish cổng ra máy host. `app`, `db`, `pgadmin`, `grafana`, `prometheus` và các exporter chỉ giao tiếp trong mạng `app-network`.
+Luồng log tập trung:
+
+```
+containers (stdout/stderr) ──► promtail :9080 ──► loki :3100 ──► grafana
+                              (Docker socket read-only)           (Loki datasource)
+```
+
+Chỉ service `nginx` được publish cổng ra máy host. `app`, `db`, `pgadmin`, `grafana`, `prometheus`, `loki`, `promtail` và các exporter chỉ giao tiếp trong mạng `app-network`.
 
 | Service             | Image / Build                         | Cổng nội bộ | Truy cập từ ngoài                        |
 |---------------------|---------------------------------------|-------------|------------------------------------------|
@@ -55,6 +62,8 @@ Chỉ service `nginx` được publish cổng ra máy host. `app`, `db`, `pgadmi
 | `cadvisor`          | `gcr.io/cadvisor/cadvisor:v0.55.1`    | 8080        | Không publish ra host                    |
 | `postgres-exporter` | `prometheuscommunity/postgres-exporter:v0.16.0` | 9187 | Không publish ra host                 |
 | `nginx-exporter`    | `nginx/nginx-prometheus-exporter:1.3.0` | 9113      | Không publish ra host                    |
+| `loki`              | `grafana/loki:3.2.1`                  | 3100        | Không publish ra host                    |
+| `promtail`          | `grafana/promtail:3.2.1`              | 9080        | Không publish ra host                    |
 | `grafana`           | `grafana/grafana:11.3.0`              | 3000        | Qua Nginx tại `/grafana/`                |
 
 ## 2. Cấu trúc thư mục
@@ -77,9 +86,13 @@ Chỉ service `nginx` được publish cổng ra máy host. `app`, `db`, `pgadmi
 ├── monitoring/
 │   ├── prometheus/
 │   │   └── prometheus.yml         # Cấu hình scrape targets
+│   ├── loki/
+│   │   └── loki.yml               # Lưu trữ log, retention 7 ngày
+│   ├── promtail/
+│   │   └── promtail.yml           # Docker SD + gửi log về Loki
 │   └── grafana/
 │       ├── provisioning/
-│       │   ├── datasources/       # Tự động thêm Prometheus datasource
+│       │   ├── datasources/       # Prometheus + Loki datasource
 │       │   └── dashboards/        # Provider nạp dashboard từ thư mục
 │       └── dashboards/
 │           ├── containers.json    # CPU, RAM, network theo container
@@ -97,6 +110,7 @@ Chỉ service `nginx` được publish cổng ra máy host. `app`, `db`, `pgadmi
 ├── .gitignore
 ├── .gitattributes
 ├── docker-compose.yml
+├── LOG_QUERIES.md                 # 3 truy vấn LogQL mẫu + biến thể
 └── README.md
 ```
 
@@ -104,6 +118,7 @@ Chỉ service `nginx` được publish cổng ra máy host. `app`, `db`, `pgadmi
 
 - Docker Engine 24+ và Docker Compose v2 (Docker Desktop trên Windows/macOS).
 - Cổng **80** và **443** đang trống (có thể đổi trong `.env`).
+- Docker socket `/var/run/docker.sock` tồn tại để Promtail đọc log container. Với Docker rootless, cập nhật đường dẫn socket trong `monitoring/promtail/promtail.yml` và volume mount tương ứng.
 - Git (chỉ cần nếu muốn quản lý phiên bản mã nguồn).
 
 Kiểm tra phiên bản:
@@ -196,9 +211,9 @@ Lần chạy đầu tiên sẽ:
 2. Tạo volume `postgres-data`, khởi tạo schema và nạp dữ liệu mẫu từ `database/init.sql`.
 3. Tạo chứng chỉ TLS self-signed cho `localhost`.
 4. Khởi động pgAdmin và import sẵn server "Library PostgreSQL".
-5. Khởi động Prometheus, cAdvisor, các exporter và Grafana; Grafana tự nhận Prometheus datasource và 3 dashboard mẫu.
+5. Khởi động Prometheus, cAdvisor, các exporter, Loki, Promtail và Grafana; Grafana tự nhận Prometheus + Loki datasource, 3 dashboard mẫu và sẵn sàng truy vấn log.
 
-Kiểm tra trạng thái (chờ đến khi 9 service báo `healthy` hoặc `running`):
+Kiểm tra trạng thái (chờ đến khi 11 service báo `healthy` hoặc `running`):
 
 ```bash
 docker compose ps
@@ -227,6 +242,7 @@ Dữ liệu vẫn được giữ trong volume. Thêm `-v` nếu muốn xóa sạ
 | Giao diện qua TLS | https://localhost                |
 | pgAdmin           | http://localhost/pgadmin/        |
 | Grafana           | http://localhost/grafana/        |
+| Grafana Explore   | http://localhost/grafana/explore |
 | Health check      | http://localhost/health          |
 | Nginx health      | http://localhost/healthz         |
 
@@ -250,7 +266,9 @@ Server **Library PostgreSQL** đã được import sẵn (host `db`, port `5432`
 docker compose exec grafana grafana cli admin reset-admin-password '<mật-khẩu-mới>'
 ```
 
-## 7. Giám sát với Prometheus + Grafana
+Grafana tự động nhận hai datasource **Prometheus** và **Loki**. Mở **Explore** (`http://localhost/grafana/explore`), chọn datasource **Loki** để xem log; các truy vấn mẫu nằm trong [`LOG_QUERIES.md`](LOG_QUERIES.md).
+
+## 7. Giám sát và log tập trung
 
 ### 7.1. Nguồn metrics
 
@@ -266,7 +284,7 @@ Prometheus scrape các target sau theo chu kỳ 15 giây (cấu hình tại `mon
 
 Các container được gắn nhãn từ Docker Compose (`container_label_com_docker_compose_project=library-management`, `container_label_com_docker_compose_service=<tên service>`), nhờ đó dashboard tách được CPU/RAM theo từng service.
 
-`/metrics` của ứng dụng chỉ mở trong mạng Docker. Nginx chặn `/metrics` và `/metrics/` với HTTP 404 để không lộ số liệu ra ngoài. Prometheus, cAdvisor và các exporter cũng không publish cổng ra host.
+`/metrics` của ứng dụng chỉ mở trong mạng Docker. Nginx chặn `/metrics` và `/metrics/` với HTTP 404 để không lộ số liệu ra ngoài. Prometheus, cAdvisor, Loki, Promtail và các exporter cũng không publish cổng ra host.
 
 ### 7.2. Dashboard có sẵn
 
@@ -313,6 +331,16 @@ docker compose logs cadvisor | tail -50
 
 Phiên bản image `v0.55.1` hỗ trợ Docker dùng containerd image store; các bản cũ hơn có thể không thấy container và chỉ báo metric của cgroup gốc.
 
+### 7.5. Log tập trung với Loki + Promtail
+
+- **Promtail** dùng Docker service discovery qua `/var/run/docker.sock` (mount read-only), chỉ lấy container thuộc project `library-management`, gắn label `service`, `container`, `project` rồi đẩy log về `http://loki:3100`.
+- **Loki** lưu log trên filesystem trong volume `loki-data`, giữ 7 ngày (`retention_period: 168h`). Port `3100` không publish ra host.
+- **Grafana** tự động nạp datasource Loki từ `monitoring/grafana/provisioning/datasources/loki.yml`. Vào **Explore → Loki** để xem log. Nếu thêm datasource vào một stack Grafana đang chạy, khởi động lại Grafana một lần (`docker compose restart grafana`) vì provisioning datasource được đọc khi khởi động.
+- **3 truy vấn LogQL mẫu** (Nginx error, kết nối PostgreSQL, access log của app) và các biến thể nằm trong [`LOG_QUERIES.md`](LOG_QUERIES.md).
+- App ghi access log dạng JSON nhưng **không ghi query string, body hay header**; PostgreSQL bật `log_connections`/`log_disconnections` để audit kết nối.
+
+Promtail cần đọc Docker API nên được mount Docker socket. Đây là quyền nhạy cảm tương đương quyền quản trị Docker; socket chỉ được mount read-only, container không chạy privileged và không publish port. Image Promtail chạy UID 0 để đọc socket `root:root 660`; đây là ngoại lệ có chủ đích so với `app`, Loki và Grafana (đều chạy non-root). Chỉ dùng cấu hình này trên máy tin cậy; production nên thay bằng Docker socket proxy giới hạn endpoint hoặc thu thập log qua driver/agent chuyên dụng.
+
 ## 8. Chức năng chính
 
 ### Tổng quan
@@ -340,15 +368,17 @@ Phiên bản image `v0.55.1` hỗ trợ Docker dùng containerd image store; cá
 ## 9. Bảo mật và hardening
 
 ### Hạ tầng
-- Mạng riêng `app-network` (bridge); chỉ `nginx` publish cổng 80/443. `db`, `pgadmin`, `grafana`, `prometheus`, `cadvisor` và các exporter không publish cổng ra host.
+- Mạng riêng `app-network` (bridge); chỉ `nginx` publish cổng 80/443. `db`, `pgadmin`, `grafana`, `prometheus`, `loki`, `promtail`, `cadvisor` và các exporter không publish cổng ra host.
 - Container `app` chạy bằng user không phải root (`node`, UID 1000).
 - `app` dùng root filesystem chỉ đọc (`read_only: true`), `/tmp` là tmpfs.
-- `cap_drop: ALL` cho `app`; `no-new-privileges:true` cho tất cả service.
+- `cap_drop: ALL` cho `app`, `loki` và `promtail`; `no-new-privileges:true` cho tất cả service.
 - `cadvisor` là ngoại lệ có chủ đích: cần `privileged: true` để đọc cgroups của host. Các mount của nó đều là read-only; không cấp quyền này cho service khác.
+- `promtail` là ngoại lệ thứ hai: cần Docker socket để đọc log container. Socket được mount read-only, root filesystem read-only (`/tmp` là tmpfs), không publish port, không privileged và `cap_drop: ALL`; xem cảnh báo tại mục 7.5.
 - PostgreSQL xác thực host bằng `scram-sha-256`.
 - Ba mật khẩu dài, ngẫu nhiên cho PostgreSQL, pgAdmin và Grafana, lưu trong `.env` (đã gitignore).
 - Grafana tắt đăng ký tài khoản và truy cập ẩn danh.
-- `/metrics` của ứng dụng bị Nginx chặn công khai; Prometheus và exporter chỉ truy cập nội bộ.
+- `/metrics` của ứng dụng bị Nginx chặn công khai; Prometheus và exporter chỉ truy cập nội bộ. Loki/Promtail cũng chỉ chạy trong `app-network`.
+- Access log của app chỉ ghi method, path, status và duration; không ghi query string, body, cookie hay header. PostgreSQL chỉ ghi connection metadata, không ghi mật khẩu.
 
 ### Ứng dụng
 - Truy vấn tham số hóa (parameterized queries) — chống SQL injection.
@@ -366,6 +396,27 @@ Phiên bản image `v0.55.1` hỗ trợ Docker dùng containerd image store; cá
 - TLS 1.2/1.3, tắt session tickets, HTTP/2 trên cổng 443.
 - Ẩn header bảo mật trùng lặp từ upstream để tránh xung đột.
 - Chặn `/metrics`, `/metrics/`; chỉ proxy `/grafana/` và `/pgadmin/` qua đúng prefix.
+
+### Kiểm tra hardening
+
+Các kiểm tra dưới đây đã được chạy trên stack hiện tại:
+
+| Hạng mục | Lệnh / cách kiểm tra | Kết quả |
+|----------|----------------------|---------|
+| Non-root app | `docker compose exec app id` | `uid=1000(node)` |
+| Loki / Grafana non-root | `docker compose exec loki id`, `docker compose exec grafana id` | `uid=10001(loki)`, `uid=472(grafana)` |
+| App read-only + caps | `docker inspect library-management-app-1` | `ReadonlyRootfs=true`, `CapDrop=["ALL"]`, `no-new-privileges` |
+| Promtail | `docker inspect library-management-promtail-1` | Docker socket `rw=false`, `privileged=false`, `CapDrop=["ALL"]`, root filesystem read-only |
+| Network isolation | `docker ps --filter name=library-management-` | Chỉ `nginx` có host binding `0.0.0.0:80` và `0.0.0.0:443` |
+| Security headers | `curl -I http://localhost/books` | Có `X-Frame-Options: DENY`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, CSP chặt |
+| Metrics không public | `curl -o /dev/null -w '%{http_code}' http://localhost/metrics` | `404` |
+| Grafana authentication | `curl -o /dev/null -w '%{http_code}' http://localhost/grafana/api/search` | `401` khi chưa đăng nhập |
+| Password isolation | `git check-ignore -v .env` | `.gitignore:2:.env` |
+| Password strength | kiểm tra độ dài trong shell (không in giá trị) | 3 mật khẩu riêng biệt, mỗi mật khẩu 64 ký tự hex |
+| PostgreSQL auth | `SHOW password_encryption` | `scram-sha-256` |
+
+> App, Loki và Grafana chạy non-root. Nginx chạy master process bằng root (worker là `nginx`) theo image chuẩn; Promtail chạy UID 0 theo image để đọc Docker socket. Hai ngoại lệ này không publish cổng và đều có `no-new-privileges`.
+
 
 > **Phạm vi đồ án:** ứng dụng chưa có đăng nhập/phân quyền cho người dùng cuối (Grafana và pgAdmin có đăng nhập riêng). Không nên triển khai ra Internet công khai khi chưa bổ sung xác thực, rate limiting và cảnh báo giám sát.
 
@@ -406,6 +457,7 @@ docker compose ps
 docker compose logs -f
 docker compose logs -f app
 docker compose logs -f prometheus grafana cadvisor
+docker compose logs -f loki promtail
 
 # Build lại và khởi động
 docker compose up -d --build
@@ -414,11 +466,12 @@ docker compose up -d --build
 docker compose restart app
 docker compose restart nginx
 docker compose restart prometheus grafana
+docker compose restart loki promtail
 
 # Dừng và xóa container (giữ dữ liệu)
 docker compose down
 
-# Dừng và XÓA TOÀN BỘ dữ liệu (PostgreSQL, pgAdmin, Prometheus, Grafana, chứng chỉ)
+# Dừng và XÓA TOÀN BỘ dữ liệu (PostgreSQL, pgAdmin, Prometheus, Grafana, Loki, Promtail, chứng chỉ)
 docker compose down -v
 
 # Kiểm tra cấu hình compose + biến môi trường
@@ -443,7 +496,7 @@ docker compose down -v
 docker compose up -d --build
 ```
 
-> `docker compose down -v` xóa vĩnh viễn dữ liệu PostgreSQL, cấu hình pgAdmin, metrics Prometheus và trạng thái Grafana. Dashboard mẫu vẫn được provisioning lại từ file JSON; tài khoản admin Grafana được tạo lại với mật khẩu trong `.env`. Cân nhắc sao lưu trước.
+> `docker compose down -v` xóa vĩnh viễn dữ liệu PostgreSQL, cấu hình pgAdmin, metrics Prometheus, trạng thái Grafana và toàn bộ log/positions của Loki + Promtail. Dashboard mẫu vẫn được provisioning lại từ file JSON; tài khoản admin Grafana được tạo lại với mật khẩu trong `.env`. Cân nhắc sao lưu trước.
 
 ## 12. Xử lý sự cố
 
@@ -520,6 +573,18 @@ docker compose logs -f grafana
 
 Nếu dashboard sửa trên UI bị ghi đè, đó là do provider `allowUiUpdates: true` kết hợp file JSON; hãy sửa file trong `monitoring/grafana/dashboards/` hoặc xuất dashboard ra JSON.
 
+### Loki không có log hoặc Grafana Explore báo "No data"
+- Kiểm tra Loki và Promtail: `docker compose ps loki promtail`.
+- Xem log: `docker compose logs --tail=100 loki promtail`.
+- Kiểm tra Loki sẵn sàng và label đã nhận:
+  ```bash
+  docker compose exec loki wget -qO- http://127.0.0.1:3100/ready
+  docker compose exec loki wget -qO- 'http://127.0.0.1:3100/loki/api/v1/labels'
+  ```
+- Promtail lọc theo Compose project `library-management` (khai báo bằng `name:` trong `docker-compose.yml`). Nếu chạy với project name khác, cập nhật filter trong `monitoring/promtail/promtail.yml`.
+- Trên Linux, nếu Promtail báo `permission denied` khi đọc `/var/run/docker.sock`, kiểm tra quyền của socket và group của user chạy Promtail; không publish Docker socket ra mạng.
+- Chờ 10–20 giây sau khi container phát sinh log, chọn đúng time range trong Grafana rồi chạy lại query. Các truy vấn mẫu có trong [`LOG_QUERIES.md`](LOG_QUERIES.md).
+
 ### Đổi mật khẩu Grafana trong `.env` nhưng không có tác dụng
 `GF_SECURITY_ADMIN_PASSWORD` chỉ được dùng khi Grafana khởi tạo database lần đầu. Đặt lại mật khẩu:
 
@@ -548,6 +613,7 @@ Lệnh này hiển thị cấu hình sau khi thay biến. Không chia sẻ outpu
 - **pgAdmin 4** (server mode).
 - **Nginx 1.27** reverse proxy, TLS, security headers.
 - **Prometheus 2.55** + **Grafana 11.3** cho metrics và dashboard.
+- **Loki 3.2** + **Promtail 3.2** cho log tập trung và truy vấn LogQL.
 - **cAdvisor 0.55**, **postgres-exporter**, **nginx-prometheus-exporter** làm nguồn metrics.
 - **express-prom-bundle** + **prom-client** cho metrics của Node.js.
 - **Docker Compose** với healthcheck, volume, mạng riêng.
@@ -559,6 +625,7 @@ Lệnh này hiển thị cấu hình sau khi thay biến. Không chia sẻ outpu
 - Cân nhắc không public pgAdmin, hoặc giới hạn IP truy cập `/pgadmin/`.
 - Giới hạn IP truy cập `/grafana/`, dùng SSO/OAuth nếu có nhiều người dùng; không public Prometheus, cAdvisor hay `/metrics`.
 - cAdvisor cần `privileged`; chỉ chạy trên host tin cậy và theo dõi các bản vá image.
+- Không public Loki/Promtail; thay Docker socket trực tiếp bằng socket proxy giới hạn endpoint hoặc dùng log driver/agent phù hợp. Cấu hình retention và sao lưu `loki-data` theo nhu cầu lưu trữ.
 - Bật HSTS sau khi đã chắc chắn chạy HTTPS ổn định.
-- Sao lưu định kỳ volume `postgres-data`, `grafana-data` và cấu hình dashboard; cân nhắc lưu metrics dài hạn nếu cần.
+- Sao lưu định kỳ volume `postgres-data`, `grafana-data`, `loki-data` và cấu hình dashboard; cân nhắc lưu metrics/log dài hạn nếu cần.
 - Cấu hình Alertmanager hoặc Grafana Alerting cho các ngưỡng CPU/RAM, lỗi 5xx và DB down.

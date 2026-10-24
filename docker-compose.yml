@@ -57,6 +57,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Hãy tạo file .env từ .env.example}
       POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
       TZ: ${TZ:-Asia/Ho_Chi_Minh}
+    # Connection/disconnection events make database access auditable in Loki.
+    command: ["postgres", "-c", "log_connections=on", "-c", "log_disconnections=on"]
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./database/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
@@ -204,6 +206,72 @@ services:
     networks:
       - app-network
 
+  # -------------------------------------------------------------------------
+  # Centralized logging: Loki stores logs, Promtail discovers Docker
+  # containers and ships their stdout/stderr to Loki.
+  # -------------------------------------------------------------------------
+  loki:
+    image: grafana/loki:3.2.1
+    restart: unless-stopped
+    command:
+      - -config.file=/etc/loki/loki.yml
+    volumes:
+      - ./monitoring/loki/loki.yml:/etc/loki/loki.yml:ro
+      - loki-data:/loki
+    expose:
+      - "3100"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q --spider http://127.0.0.1:3100/ready || exit 1",
+        ]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - app-network
+
+  promtail:
+    image: grafana/promtail:3.2.1
+    restart: unless-stopped
+    command:
+      - -config.file=/etc/promtail/promtail.yml
+    volumes:
+      - ./monitoring/promtail/promtail.yml:/etc/promtail/promtail.yml:ro
+      # Read-only access to Docker's log API. No Docker port is published.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - promtail-positions:/var/lib/promtail
+    depends_on:
+      loki:
+        condition: service_healthy
+    expose:
+      - "9080"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q --spider http://127.0.0.1:9080/ready || exit 1",
+        ]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - app-network
+
   grafana:
     image: grafana/grafana:11.3.0
     restart: unless-stopped
@@ -224,6 +292,8 @@ services:
     depends_on:
       prometheus:
         condition: service_started
+      loki:
+        condition: service_healthy
     expose:
       - "3000"
     healthcheck:
@@ -273,8 +343,8 @@ services:
       - app-network
 
 networks:
-  # Dedicated, isolated bridge network: only these four containers can talk
-  # to each other. PostgreSQL and pgAdmin are not published to the host.
+  # Dedicated bridge network for the whole stack. Only Nginx is published to
+  # the host; databases, admin UIs, metrics and logging stay internal.
   app-network:
     name: app-network
     driver: bridge
@@ -285,3 +355,5 @@ volumes:
   nginx-certs:
   prometheus-data:
   grafana-data:
+  loki-data:
+  promtail-positions:
