@@ -1,0 +1,110 @@
+<%- include('../partials/header') %>
+
+<div class="page-heading">
+  <div>
+    <h2>Danh sách độc giả</h2>
+    <p><%= readers.length %> hồ sơ<%= q ? ' phù hợp với tìm kiếm' : ' trong hệ thống' %>.</p>
+  </div>
+  <a class="btn btn-primary" href="/readers/new">
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+    Thêm độc giả
+  </a>
+</div>
+
+<form class="search-bar" method="get" action="/readers" role="search">
+  <div class="search-field">
+    <span class="search-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none">
+        <circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.8"/>
+        <path d="m16 16 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>
+    </span>
+    <label class="sr-only" for="reader-search">Tìm độc giả</label>
+    <input id="reader-search" type="search" name="q" value="<%= q %>" maxlength="100" placeholder="Tìm theo họ tên, email hoặc số điện thoại…">
+  </div>
+  <button class="btn btn-secondary" type="submit">Tìm kiếm</button>
+  <% if (q) { %>
+    <a class="btn btn-ghost" href="/readers">Xoá lọc</a>
+  <% } %>
+</form>
+
+<% if (readers.length === 0) { %>
+  <section class="panel">
+    <div class="empty-state">
+      <span class="empty-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none">
+          <circle cx="9" cy="8" r="3" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M3.5 20c.3-3.4 2.5-5.5 5.5-5.5s5.2 2.1 5.5 5.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          <circle cx="17" cy="9" r="2.2" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M15.5 14.8c2.8-.4 4.8 1.4 5 4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <h4><%= q ? 'Không tìm thấy độc giả phù hợp' : 'Chưa có hồ sơ độc giả' %></h4>
+      <p><%= q ? 'Thử một từ khoá khác hoặc xoá bộ lọc.' : 'Thêm độc giả đầu tiên để bắt đầu cho mượn sách.' %></p>
+      <% if (q) { %>
+        <a class="btn btn-secondary btn-sm" href="/readers">Xem tất cả độc giả</a>
+      <% } else { %>
+        <a class="btn btn-primary btn-sm" href="/readers/new">Thêm độc giả đầu tiên</a>
+      <% } %>
+    </div>
+  </section>
+<% } else { %>
+  <section class="reader-grid" aria-label="Danh sách độc giả">
+    <% readers.forEach((reader) => { %>
+      <article class="reader-card">
+        <div class="reader-card-head">
+          <span class="avatar"><%= initials(reader.full_name) %></span>
+          <div class="reader-identity">
+            <h3><%= reader.full_name %></h3>
+            <a href="mailto:<%= reader.email %>"><%= reader.email %></a>
+          </div>
+          <div class="table-actions">
+            <a class="icon-btn" href="/readers/<%= reader.id %>/edit" title="Sửa độc giả" aria-label="Sửa độc giả <%= reader.full_name %>">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="m14.5 5.5 4 4M4 20l4.2-1 10.1-10.1a2.1 2.1 0 0 0-3-3L5.2 16 4 20Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </a>
+            <form method="post" action="/readers/<%= reader.id %>/delete" class="inline-form" data-confirm="Xoá độc giả “<%= reader.full_name %>”? Thao tác này không thể hoàn tác.">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <button class="icon-btn icon-btn-danger" type="submit" title="Xoá độc giả" aria-label="Xoá độc giả <%= reader.full_name %>">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M5 7h14M9 7V4.5h6V7M7 7l.8 12.1A1.5 1.5 0 0 0 9.3 20h5.4a1.5 1.5 0 0 0 1.5-1.4L17 7M10 10.5v6M14 10.5v6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <dl class="reader-meta">
+          <div>
+            <dt>Điện thoại</dt>
+            <dd><%= reader.phone %></dd>
+          </div>
+          <div>
+            <dt>Đang mượn</dt>
+            <dd>
+              <% if (reader.active_loans > 0) { %>
+                <span class="badge badge-info"><%= reader.active_loans %> cuốn</span>
+              <% } else { %>
+                <span class="badge badge-muted">Không có</span>
+              <% } %>
+            </dd>
+          </div>
+          <div>
+            <dt>Tổng phiếu mượn</dt>
+            <dd><%= reader.total_loans %></dd>
+          </div>
+        </dl>
+
+        <div class="reader-card-footer">
+          <span>Mã độc giả #<%= String(reader.id).padStart(3, '0') %></span>
+          <a class="text-link" href="/loans/new">Cho mượn sách</a>
+        </div>
+      </article>
+    <% }) %>
+  </section>
+<% } %>
+
+<%- include('../partials/footer') %>

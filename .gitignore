@@ -1,0 +1,28 @@
+# Secrets — never commit real credentials
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+app/node_modules/
+
+# Build / runtime output
+*.log
+npm-debug.log*
+coverage/
+dist/
+
+# Local volumes and certificates
+nginx/certs/
+postgres-data/
+pgadmin-data/
+
+# Operating system / editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local Compose overrides
+docker-compose.override.yml

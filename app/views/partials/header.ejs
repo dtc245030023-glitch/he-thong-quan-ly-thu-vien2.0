@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Hệ thống quản lý thư viện: sách, độc giả, mượn và trả sách.">
+  <title><%= pageTitle %> · Thư Viện</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/styles.css">
+  <script src="/js/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Bỏ qua điều hướng</a>
+
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="/" aria-label="Trang chủ Thư Viện">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M4 5.5C4 4.7 4.7 4 5.5 4H11v16H5.5C4.7 20 4 19.3 4 18.5v-13Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+            <path d="M20 5.5c0-.8-.7-1.5-1.5-1.5H13v16h5.5c.8 0 1.5-.7 1.5-1.5v-13Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+            <path d="M7 8h1.5M7 11h1.5M15.5 8H17M15.5 11H17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+        </span>
+        <span class="brand-copy">
+          <strong>Thư Viện</strong>
+          <small>Library Manager</small>
+        </span>
+      </a>
+
+      <nav class="nav" aria-label="Điều hướng chính">
+        <p class="nav-label">Không gian làm việc</p>
+
+        <a class="nav-link <%= active === 'dashboard' ? 'is-active' : '' %>" href="/" aria-current="<%= active === 'dashboard' ? 'page' : 'false' %>">
+          <span class="nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <rect x="4" y="4" width="6.5" height="6.5" rx="1.5" stroke="currentColor" stroke-width="1.7"/>
+              <rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5" stroke="currentColor" stroke-width="1.7"/>
+              <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5" stroke="currentColor" stroke-width="1.7"/>
+              <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5" stroke="currentColor" stroke-width="1.7"/>
+            </svg>
+          </span>
+          <span>Tổng quan</span>
+        </a>
+
+        <a class="nav-link <%= active === 'books' ? 'is-active' : '' %>" href="/books" aria-current="<%= active === 'books' ? 'page' : 'false' %>">
+          <span class="nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v16H6.5A1.5 1.5 0 0 0 5 20.5v-16Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+              <path d="M5 20.5A1.5 1.5 0 0 0 6.5 22H19v-3" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+              <path d="M9 7h6M9 10.5h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <span>Quản lý sách</span>
+        </a>
+
+        <a class="nav-link <%= active === 'readers' ? 'is-active' : '' %>" href="/readers" aria-current="<%= active === 'readers' ? 'page' : 'false' %>">
+          <span class="nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <circle cx="9" cy="8" r="3" stroke="currentColor" stroke-width="1.7"/>
+              <path d="M3.5 20c.3-3.4 2.5-5.5 5.5-5.5s5.2 2.1 5.5 5.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+              <circle cx="17" cy="9" r="2.2" stroke="currentColor" stroke-width="1.7"/>
+              <path d="M15.5 14.8c2.8-.4 4.8 1.4 5 4.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <span>Độc giả</span>
+        </a>
+
+        <a class="nav-link <%= active === 'loans' ? 'is-active' : '' %>" href="/loans" aria-current="<%= active === 'loans' ? 'page' : 'false' %>">
+          <span class="nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M4 8h13l-3-3M20 16H7l3 3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M4 8l3 3M20 16l-3-3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          <span>Mượn / trả</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="sidebar-status">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span>Stack đang hoạt động</span>
+        </div>
+        <p>Node.js · PostgreSQL · Nginx</p>
+      </div>
+    </aside>
+
+    <div class="page-shell">
+      <header class="topbar">
+        <div class="topbar-copy">
+          <span class="topbar-eyebrow">Hệ thống quản lý thư viện</span>
+          <h1><%= pageTitle %></h1>
+          <% if (pageSubtitle) { %>
+            <p><%= pageSubtitle %></p>
+          <% } %>
+        </div>
+        <div class="topbar-meta">
+          <span class="system-chip">
+            <span class="status-dot" aria-hidden="true"></span>
+            Trực tuyến
+          </span>
+        </div>
+      </header>
+
+      <main class="content" id="main-content">
+        <%- include('flash') %>

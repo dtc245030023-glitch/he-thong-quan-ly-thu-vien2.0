@@ -1,0 +1,131 @@
+<%- include('../partials/header') %>
+
+<div class="page-heading">
+  <div>
+    <h2>Danh mục sách</h2>
+        <p><%= books.length %> đầu sách<%= q ? ' phù hợp với tìm kiếm' : ' trong hệ thống' %>.</p>
+  </div>
+  <a class="btn btn-primary" href="/books/new">
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+    Thêm sách
+  </a>
+</div>
+
+<form class="search-bar" method="get" action="/books" role="search">
+  <div class="search-field">
+    <span class="search-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none">
+        <circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.8"/>
+        <path d="m16 16 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>
+    </span>
+    <label class="sr-only" for="book-search">Tìm sách</label>
+    <input id="book-search" type="search" name="q" value="<%= q %>" maxlength="100" placeholder="Tìm theo tên sách, tác giả, ISBN hoặc thể loại…">
+  </div>
+  <button class="btn btn-secondary" type="submit">Tìm kiếm</button>
+  <% if (q) { %>
+    <a class="btn btn-ghost" href="/books">Xoá lọc</a>
+  <% } %>
+</form>
+
+<section class="panel table-panel">
+  <% if (books.length === 0) { %>
+    <div class="empty-state">
+      <span class="empty-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none">
+          <path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v16H6.5A1.5 1.5 0 0 0 5 20.5v-16Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+          <path d="M5 20.5A1.5 1.5 0 0 0 6.5 22H19v-3" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+        </svg>
+      </span>
+      <h4><%= q ? 'Không tìm thấy đầu sách phù hợp' : 'Thư viện chưa có sách' %></h4>
+      <p><%= q ? 'Thử từ khoá ngắn hơn hoặc xoá bộ lọc để xem toàn bộ danh mục.' : 'Thêm đầu sách đầu tiên để bắt đầu quản lý kho.' %></p>
+      <% if (q) { %>
+        <a class="btn btn-secondary btn-sm" href="/books">Xem tất cả sách</a>
+      <% } else { %>
+        <a class="btn btn-primary btn-sm" href="/books/new">Thêm sách đầu tiên</a>
+      <% } %>
+    </div>
+  <% } else { %>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Sách</th>
+            <th>ISBN</th>
+            <th>Thể loại</th>
+            <th>Kho</th>
+            <th>Trạng thái</th>
+            <th class="align-right">Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% books.forEach((book) => { %>
+            <tr>
+              <td>
+                <div class="book-cell book-cell-main">
+                  <span class="book-thumb" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none">
+                      <path d="M6 4.5A1.5 1.5 0 0 1 7.5 3H19v15H7.5A1.5 1.5 0 0 0 6 19.5v-15Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                      <path d="M6 19.5A1.5 1.5 0 0 0 7.5 21H19v-3" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                    </svg>
+                  </span>
+                  <div>
+                    <strong><%= book.title %></strong>
+                    <span><%= book.author %></span>
+                  </div>
+                </div>
+              </td>
+              <td><code class="isbn"><%= book.isbn %></code></td>
+              <td><span class="tag"><%= book.category %></span></td>
+              <td>
+                <div class="stock-cell">
+                  <div class="stock-copy">
+                    <strong><%= book.available_copies %></strong>
+                    <span>/ <%= book.total_copies %> bản</span>
+                  </div>
+                  <progress
+                    class="progress progress-sm <%= stockTone(book.available_copies, book.total_copies) %>"
+                    value="<%= book.available_copies %>"
+                    max="<%= book.total_copies %>"
+                    aria-label="Số bản sao còn lại của <%= book.title %>"
+                  ><%= book.available_copies %>/<%= book.total_copies %></progress>
+                  <% if (book.borrowed_copies > 0) { %>
+                    <span class="stock-note"><%= book.borrowed_copies %> đang được mượn</span>
+                  <% } %>
+                </div>
+              </td>
+              <td>
+                <% if (book.available_copies > 0) { %>
+                  <span class="badge badge-success">Còn sách</span>
+                <% } else { %>
+                  <span class="badge badge-muted">Hết sách</span>
+                <% } %>
+              </td>
+              <td>
+                <div class="table-actions">
+                  <a class="icon-btn" href="/books/<%= book.id %>/edit" title="Sửa sách" aria-label="Sửa sách <%= book.title %>">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="m14.5 5.5 4 4M4 20l4.2-1 10.1-10.1a2.1 2.1 0 0 0-3-3L5.2 16 4 20Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  </a>
+                  <form method="post" action="/books/<%= book.id %>/delete" class="inline-form" data-confirm="Xoá sách “<%= book.title %>”? Thao tác này không thể hoàn tác.">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button class="icon-btn icon-btn-danger" type="submit" title="Xoá sách" aria-label="Xoá sách <%= book.title %>">
+                      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M5 7h14M9 7V4.5h6V7M7 7l.8 12.1A1.5 1.5 0 0 0 9.3 20h5.4a1.5 1.5 0 0 0 1.5-1.4L17 7M10 10.5v6M14 10.5v6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                      </svg>
+                    </button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</section>
+
+<%- include('../partials/footer') %>

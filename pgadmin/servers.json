@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "Library PostgreSQL",
+      "Group": "Thư viện",
+      "Host": "db",
+      "Port": 5432,
+      "MaintenanceDB": "library_db",
+      "Username": "library_admin",
+      "SSLMode": "prefer",
+      "Comment": "PostgreSQL nội bộ của ứng dụng quản lý thư viện"
+    }
+  }
+}

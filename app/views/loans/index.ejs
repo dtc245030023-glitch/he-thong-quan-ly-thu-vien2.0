@@ -1,0 +1,133 @@
+<%- include('../partials/header') %>
+
+<div class="page-heading">
+  <div>
+    <h2>Phiếu mượn sách</h2>
+    <p>Theo dõi toàn bộ lượt mượn, hạn trả và tình trạng quá hạn.</p>
+  </div>
+  <a class="btn btn-primary" href="/loans/new">
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+    Lập phiếu mượn
+  </a>
+</div>
+
+<nav class="segmented" aria-label="Lọc phiếu mượn">
+  <a class="segment <%= filter === 'active' ? 'is-active' : '' %>" href="/loans?status=active" aria-current="<%= filter === 'active' ? 'page' : 'false' %>">
+    Đang mượn <span class="segment-count"><%= counts.active %></span>
+  </a>
+  <a class="segment <%= filter === 'overdue' ? 'is-active' : '' %>" href="/loans?status=overdue" aria-current="<%= filter === 'overdue' ? 'page' : 'false' %>">
+    Quá hạn <span class="segment-count segment-count-danger"><%= counts.overdue %></span>
+  </a>
+  <a class="segment <%= filter === 'returned' ? 'is-active' : '' %>" href="/loans?status=returned" aria-current="<%= filter === 'returned' ? 'page' : 'false' %>">
+    Đã trả <span class="segment-count"><%= counts.returned %></span>
+  </a>
+  <a class="segment <%= filter === 'all' ? 'is-active' : '' %>" href="/loans?status=all" aria-current="<%= filter === 'all' ? 'page' : 'false' %>">
+    Tất cả <span class="segment-count"><%= counts.total %></span>
+  </a>
+</nav>
+
+<section class="panel table-panel">
+  <% if (loans.length === 0) { %>
+    <div class="empty-state">
+      <span class="empty-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none">
+          <path d="M4 8h13l-3-3M20 16H7l3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+      <h4>
+        <% if (filter === 'active') { %>
+          Không có phiếu nào đang mượn
+        <% } else if (filter === 'overdue') { %>
+          Không có phiếu quá hạn
+        <% } else if (filter === 'returned') { %>
+          Chưa có phiếu nào được trả
+        <% } else { %>
+          Chưa có phiếu mượn nào
+        <% } %>
+      </h4>
+      <p>
+        <% if (filter === 'active' || filter === 'all') { %>
+          Lập phiếu mượn để bắt đầu theo dõi sách đang lưu hành.
+        <% } else { %>
+          Danh sách này sẽ được cập nhật khi có phiếu phù hợp.
+        <% } %>
+      </p>
+      <% if (filter === 'active' || filter === 'all') { %>
+        <a class="btn btn-primary btn-sm" href="/loans/new">Lập phiếu mượn</a>
+      <% } else { %>
+        <a class="btn btn-secondary btn-sm" href="/loans?status=active">Xem phiếu đang mượn</a>
+      <% } %>
+    </div>
+  <% } else { %>
+    <div class="table-wrap">
+      <table class="data-table loans-table">
+        <thead>
+          <tr>
+            <th>Độc giả</th>
+            <th>Đầu sách</th>
+            <th>Ngày mượn</th>
+            <th>Hạn trả</th>
+            <th>Trạng thái</th>
+            <th class="align-right">Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% loans.forEach((loan) => { %>
+            <tr>
+              <td>
+                <div class="person-cell">
+                  <span class="avatar avatar-sm"><%= initials(loan.full_name) %></span>
+                  <div>
+                    <strong><%= loan.full_name %></strong>
+                    <span><%= loan.email %></span>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <div class="book-cell">
+                  <strong><%= loan.title %></strong>
+                  <span><%= loan.author %> · <%= loan.isbn %></span>
+                </div>
+              </td>
+              <td class="nowrap"><%= formatDate(loan.borrowed_at) %></td>
+              <td class="nowrap <%= loan.overdue ? 'text-danger' : '' %>">
+                <strong><%= formatDate(loan.due_date) %></strong>
+              </td>
+              <td>
+                <% if (loan.status === 'returned') { %>
+                  <span class="badge badge-muted">Đã trả</span>
+                  <span class="cell-subtext">ngày <%= formatDate(loan.returned_at) %></span>
+                <% } else if (loan.overdue) { %>
+                  <span class="badge badge-danger">Quá hạn</span>
+                <% } else { %>
+                  <span class="badge badge-info">Đang mượn</span>
+                <% } %>
+              </td>
+              <td>
+                <div class="table-actions table-actions-end">
+                  <% if (loan.status === 'borrowed') { %>
+                    <form method="post" action="/loans/<%= loan.id %>/return" class="inline-form" data-confirm="Ghi nhận đã trả sách “<%= loan.title %>” cho <%= loan.full_name %>?">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      <button class="btn btn-sm btn-secondary" type="submit">
+                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <path d="M5 12.5 9.5 17 19 7.5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        Trả sách
+                      </button>
+                    </form>
+                  <% } else { %>
+                    <span class="text-muted">Hoàn tất</span>
+                  <% } %>
+                </div>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</section>
+
+<%- include('../partials/footer') %>

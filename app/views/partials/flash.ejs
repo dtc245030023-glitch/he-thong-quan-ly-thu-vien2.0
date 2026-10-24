@@ -1,0 +1,29 @@
+<% if (typeof notice !== 'undefined' && notice) { %>
+  <div class="alert alert-success" role="status">
+    <span class="alert-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/>
+        <path d="m8 12 2.6 2.7L16.5 9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </span>
+    <span class="alert-text"><%= notice %></span>
+    <button class="alert-close" type="button" data-dismiss-alert aria-label="Đóng thông báo">
+      <span aria-hidden="true">×</span>
+    </button>
+  </div>
+<% } %>
+
+<% if (typeof error !== 'undefined' && error) { %>
+  <div class="alert alert-error" role="alert">
+    <span class="alert-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M12 7.5v5.5M12 16.5v.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </span>
+    <span class="alert-text"><%= error %></span>
+    <button class="alert-close" type="button" data-dismiss-alert aria-label="Đóng thông báo">
+      <span aria-hidden="true">×</span>
+    </button>
+  </div>
+<% } %>

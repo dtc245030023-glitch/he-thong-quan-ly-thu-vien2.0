@@ -1,0 +1,166 @@
+<%- include('../partials/header') %>
+
+<nav class="breadcrumb" aria-label="Breadcrumb">
+  <a href="/loans">Mượn / trả sách</a>
+  <span aria-hidden="true">/</span>
+  <span>Lập phiếu mượn</span>
+</nav>
+
+<div class="form-layout">
+  <form class="form-card" method="post" action="/loans" data-single-submit>
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+    <header class="form-header">
+      <div>
+        <h2>Thông tin phiếu mượn</h2>
+        <p>Chọn độc giả, đầu sách và hạn trả mong muốn.</p>
+      </div>
+      <span class="tag">Ngày lập: hôm nay</span>
+    </header>
+
+    <% if (Object.keys(errors).length > 0) { %>
+      <div class="alert alert-error" role="alert">
+        <span class="alert-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M12 7.5v5.5M12 16.5v.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </span>
+        <span class="alert-text">Không thể lập phiếu. Vui lòng kiểm tra lại thông tin bên dưới.</span>
+      </div>
+    <% } %>
+
+    <% if (books.length === 0 || readers.length === 0) { %>
+      <div class="callout callout-warning">
+        <span class="callout-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M12 4 21 20H3L12 4Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+            <path d="M12 9.5v4M12 16.8v.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </span>
+        <div>
+          <% if (books.length === 0) { %>
+            <h3>Kho đã hết sách có thể mượn</h3>
+            <p>Thêm sách hoặc ghi nhận trả sách trước khi lập phiếu mới.</p>
+            <a class="text-link" href="/books/new">Thêm sách vào kho</a>
+          <% } else { %>
+            <h3>Chưa có độc giả</h3>
+            <p>Cần tạo hồ sơ độc giả trước khi cho mượn sách.</p>
+            <a class="text-link" href="/readers/new">Thêm độc giả</a>
+          <% } %>
+        </div>
+      </div>
+    <% } %>
+
+    <div class="form-grid">
+      <div class="field field-full">
+        <label for="book_id">Đầu sách <span class="required-mark">*</span></label>
+        <select
+          class="input select <%= errors.book_id ? 'is-invalid' : '' %>"
+          id="book_id"
+          name="book_id"
+          required
+          aria-invalid="<%= Boolean(errors.book_id) %>"
+        >
+          <option value="" disabled <% if (formData.book_id === '') { %>selected<% } %>>— Chọn một đầu sách còn trong kho —</option>
+          <% books.forEach((book) => { %>
+            <option value="<%= book.id %>" <% if (formData.book_id === String(book.id)) { %>selected<% } %>>
+              <%= book.title %> — <%= book.author %> (còn <%= book.available_copies %> bản)
+            </option>
+          <% }) %>
+        </select>
+        <% if (errors.book_id) { %>
+          <p class="field-error"><%= errors.book_id %></p>
+        <% } else { %>
+          <p class="field-hint"><%= books.length %> đầu sách hiện có bản sao khả dụng.</p>
+        <% } %>
+      </div>
+
+      <div class="field">
+        <label for="reader_id">Độc giả <span class="required-mark">*</span></label>
+        <select
+          class="input select <%= errors.reader_id ? 'is-invalid' : '' %>"
+          id="reader_id"
+          name="reader_id"
+          required
+          aria-invalid="<%= Boolean(errors.reader_id) %>"
+        >
+          <option value="" disabled <% if (formData.reader_id === '') { %>selected<% } %>>— Chọn độc giả —</option>
+          <% readers.forEach((reader) => { %>
+            <option value="<%= reader.id %>" <% if (formData.reader_id === String(reader.id)) { %>selected<% } %>>
+              <%= reader.full_name %> · <%= reader.email %>
+            </option>
+          <% }) %>
+        </select>
+        <% if (errors.reader_id) { %><p class="field-error"><%= errors.reader_id %></p><% } %>
+      </div>
+
+      <div class="field">
+        <label for="due_date">Hạn trả <span class="required-mark">*</span></label>
+        <input
+          class="input <%= errors.due_date ? 'is-invalid' : '' %>"
+          id="due_date"
+          name="due_date"
+          type="date"
+          value="<%= formData.due_date %>"
+          min="<%= today %>"
+          max="<%= maxDueDate %>"
+          required
+          aria-invalid="<%= Boolean(errors.due_date) %>"
+        >
+        <% if (errors.due_date) { %>
+          <p class="field-error"><%= errors.due_date %></p>
+        <% } else { %>
+          <p class="field-hint">Mặc định 14 ngày, tối đa 365 ngày kể từ hôm nay.</p>
+        <% } %>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <a class="btn btn-ghost" href="/loans">Huỷ</a>
+      <button class="btn btn-primary" type="submit" <% if (books.length === 0 || readers.length === 0) { %>disabled<% } %>>
+        Xác nhận cho mượn
+      </button>
+    </div>
+  </form>
+
+  <aside class="side-stack">
+    <section class="panel panel-compact">
+      <header class="panel-header">
+        <div>
+          <h3>Quy trình mượn</h3>
+          <p>Phiếu được cập nhật ngay khi xác nhận.</p>
+        </div>
+      </header>
+      <ol class="step-list">
+        <li>
+          <span class="step-number">1</span>
+          <div><strong>Chọn độc giả</strong><p>Đảm bảo hồ sơ đã có trong hệ thống.</p></div>
+        </li>
+        <li>
+          <span class="step-number">2</span>
+          <div><strong>Chọn đầu sách</strong><p>Chỉ hiển thị sách còn ít nhất một bản.</p></div>
+        </li>
+        <li>
+          <span class="step-number">3</span>
+          <div><strong>Ấn định hạn trả</strong><p>Ghi nhận trả sách tại trang Mượn / trả.</p></div>
+        </li>
+      </ol>
+    </section>
+
+    <section class="panel panel-compact">
+      <header class="panel-header">
+        <div>
+          <h3>Kiểm soát tồn kho</h3>
+          <p>Hệ thống tự động cập nhật.</p>
+        </div>
+      </header>
+      <ul class="info-list">
+        <li><span>Sách có thể mượn</span><strong><%= books.length %> đầu sách</strong></li>
+        <li><span>Độc giả khả dụng</span><strong><%= readers.length %> người</strong></li>
+      </ul>
+    </section>
+  </aside>
+</div>
+
+<%- include('../partials/footer') %>

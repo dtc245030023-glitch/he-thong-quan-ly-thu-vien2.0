@@ -1,0 +1,119 @@
+<%- include('../partials/header') %>
+
+<nav class="breadcrumb" aria-label="Breadcrumb">
+  <a href="/readers">Độc giả</a>
+  <span aria-hidden="true">/</span>
+  <span><%= mode === 'create' ? 'Thêm độc giả' : 'Chỉnh sửa độc giả' %></span>
+</nav>
+
+<div class="form-layout">
+  <form
+    class="form-card"
+    method="post"
+    action="<%= mode === 'create' ? '/readers' : '/readers/' + reader.id %>"
+    data-single-submit
+  >
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+    <header class="form-header">
+      <div>
+        <h2><%= mode === 'create' ? 'Hồ sơ độc giả mới' : 'Thông tin độc giả' %></h2>
+        <p>Thông tin liên hệ được dùng khi nhắc trả sách.</p>
+      </div>
+      <% if (mode === 'edit' && reader) { %>
+        <span class="tag">#<%= String(reader.id).padStart(3, '0') %></span>
+      <% } %>
+    </header>
+
+    <% if (Object.keys(errors).length > 0) { %>
+      <div class="alert alert-error" role="alert">
+        <span class="alert-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M12 7.5v5.5M12 16.5v.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </span>
+        <span class="alert-text">Vui lòng kiểm tra lại các trường được đánh dấu.</span>
+      </div>
+    <% } %>
+
+    <div class="form-grid">
+      <div class="field field-full">
+        <label for="full_name">Họ và tên <span class="required-mark">*</span></label>
+        <input
+          class="input <%= errors.full_name ? 'is-invalid' : '' %>"
+          id="full_name"
+          name="full_name"
+          type="text"
+          value="<%= formData.full_name %>"
+          maxlength="120"
+          required
+          autofocus
+          autocomplete="name"
+          aria-invalid="<%= Boolean(errors.full_name) %>"
+        >
+        <% if (errors.full_name) { %><p class="field-error"><%= errors.full_name %></p><% } %>
+      </div>
+
+      <div class="field">
+        <label for="email">Email <span class="required-mark">*</span></label>
+        <input
+          class="input <%= errors.email ? 'is-invalid' : '' %>"
+          id="email"
+          name="email"
+          type="email"
+          value="<%= formData.email %>"
+          maxlength="254"
+          required
+          autocomplete="email"
+          placeholder="docgia@example.com"
+          aria-invalid="<%= Boolean(errors.email) %>"
+        >
+        <% if (errors.email) { %><p class="field-error"><%= errors.email %></p><% } %>
+      </div>
+
+      <div class="field">
+        <label for="phone">Số điện thoại <span class="required-mark">*</span></label>
+        <input
+          class="input <%= errors.phone ? 'is-invalid' : '' %>"
+          id="phone"
+          name="phone"
+          type="tel"
+          value="<%= formData.phone %>"
+          maxlength="30"
+          required
+          autocomplete="tel"
+          inputmode="tel"
+          placeholder="0901234567"
+          aria-invalid="<%= Boolean(errors.phone) %>"
+        >
+        <% if (errors.phone) { %><p class="field-error"><%= errors.phone %></p><% } %>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <a class="btn btn-ghost" href="/readers">Huỷ</a>
+      <button class="btn btn-primary" type="submit">
+        <%= mode === 'create' ? 'Thêm độc giả' : 'Lưu thay đổi' %>
+      </button>
+    </div>
+  </form>
+
+  <aside class="side-stack">
+    <section class="panel panel-compact">
+      <header class="panel-header">
+        <div>
+          <h3>Quy định độc giả</h3>
+          <p>Dữ liệu dùng cho nghiệp vụ mượn sách.</p>
+        </div>
+      </header>
+      <ul class="tip-list">
+        <li>Email phải là duy nhất trong hệ thống.</li>
+        <li>Thời hạn mượn mặc định là 14 ngày kể từ ngày lập phiếu.</li>
+        <li>Không thể xoá độc giả đã có lịch sử mượn sách.</li>
+      </ul>
+    </section>
+  </aside>
+</div>
+
+<%- include('../partials/footer') %>

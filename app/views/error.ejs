@@ -1,0 +1,13 @@
+<%- include('partials/header') %>
+
+<section class="error-state">
+  <span class="error-code"><%= errorCode %></span>
+  <h2><%= errorTitle %></h2>
+  <p><%= errorMessage %></p>
+  <div class="button-row button-row-center">
+    <a class="btn btn-primary" href="/">Về trang tổng quan</a>
+    <a class="btn btn-secondary" href="/books">Quản lý sách</a>
+  </div>
+</section>
+
+<%- include('partials/footer') %>

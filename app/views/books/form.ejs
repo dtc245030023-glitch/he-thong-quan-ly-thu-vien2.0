@@ -1,0 +1,197 @@
+<%- include('../partials/header') %>
+
+<nav class="breadcrumb" aria-label="Breadcrumb">
+  <a href="/books">Quản lý sách</a>
+  <span aria-hidden="true">/</span>
+  <span><%= mode === 'create' ? 'Thêm sách' : 'Chỉnh sửa sách' %></span>
+</nav>
+
+<div class="form-layout">
+  <form
+    class="form-card"
+    method="post"
+    action="<%= mode === 'create' ? '/books' : '/books/' + book.id %>"
+    data-single-submit
+  >
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+    <header class="form-header">
+      <div>
+        <h2><%= mode === 'create' ? 'Thông tin sách mới' : 'Thông tin đầu sách' %></h2>
+        <p>Các trường có dấu <span class="required-mark">*</span> là bắt buộc.</p>
+      </div>
+      <% if (mode === 'edit' && book) { %>
+        <span class="badge <%= book.available_copies > 0 ? 'badge-success' : 'badge-muted' %>">
+          <%= book.available_copies %>/<%= book.total_copies %> bản còn lại
+        </span>
+      <% } %>
+    </header>
+
+    <% if (Object.keys(errors).length > 0) { %>
+      <div class="alert alert-error" role="alert">
+        <span class="alert-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M12 7.5v5.5M12 16.5v.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </span>
+        <span class="alert-text">Vui lòng kiểm tra lại các trường được đánh dấu.</span>
+      </div>
+    <% } %>
+
+    <div class="form-grid">
+      <div class="field field-full">
+        <label for="title">Tên sách <span class="required-mark">*</span></label>
+        <input
+          class="input <%= errors.title ? 'is-invalid' : '' %>"
+          id="title"
+          name="title"
+          type="text"
+          value="<%= formData.title %>"
+          maxlength="255"
+          required
+          autofocus
+          autocomplete="off"
+          aria-invalid="<%= Boolean(errors.title) %>"
+        >
+        <% if (errors.title) { %><p class="field-error"><%= errors.title %></p><% } %>
+      </div>
+
+      <div class="field">
+        <label for="author">Tác giả <span class="required-mark">*</span></label>
+        <input
+          class="input <%= errors.author ? 'is-invalid' : '' %>"
+          id="author"
+          name="author"
+          type="text"
+          value="<%= formData.author %>"
+          maxlength="255"
+          required
+          autocomplete="off"
+          aria-invalid="<%= Boolean(errors.author) %>"
+        >
+        <% if (errors.author) { %><p class="field-error"><%= errors.author %></p><% } %>
+      </div>
+
+      <div class="field">
+        <label for="isbn">ISBN <span class="required-mark">*</span></label>
+        <input
+          class="input <%= errors.isbn ? 'is-invalid' : '' %>"
+          id="isbn"
+          name="isbn"
+          type="text"
+          value="<%= formData.isbn %>"
+          maxlength="32"
+          required
+          autocomplete="off"
+          placeholder="Ví dụ: 9786041234567"
+          aria-invalid="<%= Boolean(errors.isbn) %>"
+        >
+        <% if (errors.isbn) { %>
+          <p class="field-error"><%= errors.isbn %></p>
+        <% } else { %>
+          <p class="field-hint">10 hoặc 13 chữ số; có thể nhập kèm dấu gạch ngang.</p>
+        <% } %>
+      </div>
+
+      <div class="field">
+        <label for="category">Thể loại</label>
+        <input
+          class="input <%= errors.category ? 'is-invalid' : '' %>"
+          id="category"
+          name="category"
+          type="text"
+          value="<%= formData.category %>"
+          maxlength="100"
+          list="category-options"
+          aria-invalid="<%= Boolean(errors.category) %>"
+        >
+        <datalist id="category-options">
+          <option value="Văn học"></option>
+          <option value="Khoa học"></option>
+          <option value="Công nghệ"></option>
+          <option value="Kinh tế"></option>
+          <option value="Lịch sử"></option>
+          <option value="Kỹ năng"></option>
+          <option value="Thiếu nhi"></option>
+          <option value="Khác"></option>
+        </datalist>
+        <% if (errors.category) { %><p class="field-error"><%= errors.category %></p><% } %>
+      </div>
+
+      <div class="field">
+        <label for="total_copies">Tổng số bản sao <span class="required-mark">*</span></label>
+        <input
+          class="input <%= errors.total_copies ? 'is-invalid' : '' %>"
+          id="total_copies"
+          name="total_copies"
+          type="number"
+          value="<%= formData.total_copies %>"
+          min="<%= Math.max(borrowedCopies, 1) %>"
+          max="10000"
+          step="1"
+          inputmode="numeric"
+          required
+          aria-invalid="<%= Boolean(errors.total_copies) %>"
+        >
+        <% if (errors.total_copies) { %>
+          <p class="field-error"><%= errors.total_copies %></p>
+        <% } else if (borrowedCopies > 0) { %>
+          <p class="field-hint">Hiện có <%= borrowedCopies %> bản đang được mượn.</p>
+        <% } else { %>
+          <p class="field-hint">Số bản sẵn có sẽ bằng tổng số bản sao ban đầu.</p>
+        <% } %>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <a class="btn btn-ghost" href="/books">Huỷ</a>
+      <button class="btn btn-primary" type="submit">
+        <%= mode === 'create' ? 'Thêm sách' : 'Lưu thay đổi' %>
+      </button>
+    </div>
+  </form>
+
+  <aside class="side-stack">
+    <% if (mode === 'edit' && book) { %>
+      <section class="panel panel-compact">
+        <header class="panel-header">
+          <div>
+            <h3>Tình trạng kho</h3>
+            <p>Cập nhật theo thời gian thực.</p>
+          </div>
+        </header>
+        <div class="summary-block">
+          <span class="summary-label">Sách sẵn sàng</span>
+          <strong class="summary-value"><%= book.available_copies %><small>/ <%= book.total_copies %> bản</small></strong>
+          <progress
+            class="progress <%= stockTone(book.available_copies, book.total_copies) %>"
+            value="<%= book.available_copies %>"
+            max="<%= book.total_copies %>"
+            aria-label="Tỷ lệ sách còn trong kho"
+          ></progress>
+        </div>
+        <ul class="info-list">
+          <li><span>Đang được mượn</span><strong><%= borrowedCopies %> bản</strong></li>
+          <li><span>ISBN hiện tại</span><strong><%= book.isbn %></strong></li>
+        </ul>
+      </section>
+    <% } %>
+
+    <section class="panel panel-compact">
+      <header class="panel-header">
+        <div>
+          <h3>Lưu ý</h3>
+          <p>Để kho sách luôn chính xác.</p>
+        </div>
+      </header>
+      <ul class="tip-list">
+        <li>Không thể giảm tổng số bản sao thấp hơn số sách đang được mượn.</li>
+        <li>ISBN là duy nhất; mỗi đầu sách chỉ có một mã trong hệ thống.</li>
+        <li>Sách đã có lịch sử mượn sẽ không thể xoá để bảo toàn dữ liệu.</li>
+      </ul>
+    </section>
+  </aside>
+</div>
+
+<%- include('../partials/footer') %>
