@@ -2,6 +2,7 @@ import 'dotenv/config';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
+import promBundle from 'express-prom-bundle';
 import { closeDatabase, pool, waitForDatabase } from './db.js';
 import { csrfToken, verifyCsrf } from './middleware/csrf.js';
 import booksRouter from './routes/books.js';
@@ -46,6 +47,18 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false, limit: '64kb', parameterLimit: 50 }));
+
+// Prometheus metrics. `/metrics` is scraped inside the Docker network and is
+// explicitly blocked at the Nginx edge so it is never exposed publicly.
+app.use(
+  promBundle({
+    includeMethod: true,
+    includePath: true,
+    includeStatusCode: true,
+    includeUp: true,
+    promClient: { collectDefaultMetrics: {} },
+  }),
+);
 
 // CSRF: issue a token for GET requests, verify it on all state-changing requests.
 app.use(csrfToken);
